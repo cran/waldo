@@ -7,17 +7,29 @@
 compare(
   x,
   y,
+  ...,
   x_arg = "x",
   y_arg = "y",
   tolerance = NULL,
   ignore_srcref = TRUE,
   ignore_attr = FALSE,
-  ignore_encoding = TRUE
+  ignore_encoding = TRUE,
+  ignore_function_env = FALSE,
+  ignore_formula_env = FALSE
 )
 }
 \arguments{
 \item{x, y}{Objects to compare. \code{y} is treated as the reference object
 so messages describe how \code{x} is different to \code{y}}
+
+\item{...}{A handful of other arguments are supported with a warning for
+backward compatability. These include:
+\itemize{
+\item \code{all.equal()} arguments \code{checkNames} and \code{check.attributes}
+\item \code{testthat::compare()} argument \code{tol}
+}
+
+All other arguments are ignored with a warning.}
 
 \item{x_arg, y_arg}{Name of \code{x} and \code{y} arguments, used when generated paths
 to internal components.}
@@ -46,6 +58,11 @@ differences.}
 \item{ignore_encoding}{Ignore string encoding? \code{TRUE} by default, because
 this is R's default behaviour. Use \code{FALSE} when specifically concerned
 with the encoding, not just the value of the string.}
+
+\item{ignore_function_env, ignore_formula_env}{Ignore the environments of
+functions and formulas, respectively? These are provided primarily for
+backward compatibility with \code{all.equal()} which always ignores these
+environments.}
 }
 \value{
 A character vector with class "waldo_compare". If there are no
@@ -53,9 +70,7 @@ differences it will have length 0; otherwise each element is contains
 the description of a single difference.
 }
 \description{
-This function is an alternative to \code{\link[=all.equal]{all.equal()}} that attempts to provide
-a description of the differences that is more immediately understandable.
-It:
+This compares two R objects, identifying the key differences. It:
 \itemize{
 \item Orders the differences from most important to least important.
 \item Displays the values of atomic vectors that are actually different.
@@ -65,6 +80,8 @@ when colour isn't available).
 \item Where possible, it compares elements by name, rather than by position.
 \item Errs on the side of producing too much output, rather than too little.
 }
+
+\code{compare()} is an alternative to \code{\link[=all.equal]{all.equal()}}.
 }
 \examples{
 # Thanks to diffobj package comparison of atomic vectors shows differences

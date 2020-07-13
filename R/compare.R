@@ -1,9 +1,7 @@
 #' Compare two objects
 #'
 #' @description
-#' This function is an alternative to [all.equal()] that attempts to provide
-#' a description of the differences that is more immediately understandable.
-#' It:
+#' This compares two R objects, identifying the key differences. It:
 #'
 #' * Orders the differences from most important to least important.
 #' * Displays the values of atomic vectors that are actually different.
@@ -13,10 +11,19 @@
 #' * Where possible, it compares elements by name, rather than by position.
 #' * Errs on the side of producing too much output, rather than too little.
 #'
+#' `compare()` is an alternative to [all.equal()].
+#'
 #' @param x,y Objects to compare. `y` is treated as the reference object
 #'   so messages describe how `x` is different to `y`
 #' @param x_arg,y_arg Name of `x` and `y` arguments, used when generated paths
 #'   to internal components.
+#' @param ... A handful of other arguments are supported with a warning for
+#'   backward compatability. These include:
+#'
+#'   * `all.equal()` arguments `checkNames` and `check.attributes`
+#'   * `testthat::compare()` argument `tol`
+#'
+#'   All other arguments are ignored with a warning.
 #' @param tolerance If non-`NULL`, used as threshold for ignoring small
 #'   floating point difference when comparing numeric vectors. Setting to
 #'   any non-`NULL` value will cause integer and double vectors to be compared
@@ -35,6 +42,10 @@
 #'   for backward compatibility with `all.equal()`. Using `TRUE` is not
 #'   generally recommended because it will ignore many important functional
 #'   differences.
+#' @param ignore_function_env,ignore_formula_env Ignore the environments of
+#'   functions and formulas, respectively? These are provided primarily for
+#'   backward compatibility with `all.equal()` which always ignores these
+#'   environments.
 #' @param ignore_encoding Ignore string encoding? `TRUE` by default, because
 #'   this is R's default behaviour. Use `FALSE` when specifically concerned
 #'   with the encoding, not just the value of the string.
@@ -64,37 +75,29 @@
 #' # Otherwise they're compared by position
 #' compare(list("x", "y"), list("x", "z"))
 #' compare(list(x = "x", x = "y"), list(x = "x", y = "z"))
-compare <- function(x, y,
+compare <- function(x, y, ...,
                     x_arg = "x", y_arg = "y",
                     tolerance = NULL,
                     ignore_srcref = TRUE,
                     ignore_attr = FALSE,
-                    ignore_encoding = TRUE) {
+                    ignore_encoding = TRUE,
+                    ignore_function_env = FALSE,
+                    ignore_formula_env = FALSE
+                    ) {
 
   opts <- compare_opts(
+    ...,
     tolerance = tolerance,
     ignore_srcref = ignore_srcref,
     ignore_attr = ignore_attr,
-    ignore_encoding = ignore_encoding
+    ignore_encoding = ignore_encoding,
+    ignore_formula_env = ignore_formula_env,
+    ignore_function_env = ignore_function_env
   )
   out <- compare_structure(x, y, paths = c(x_arg, y_arg), opts = opts)
   new_compare(out)
 }
 
-compare_opts <- function(tolerance = NULL,
-                         ignore_srcref = TRUE,
-                         ignore_attr = FALSE,
-                         ignore_encoding = TRUE,
-                         ignore_function_env = FALSE
-                         ) {
-  list(
-    tolerance = tolerance,
-    ignore_srcref = ignore_srcref,
-    ignore_attr = ignore_attr,
-    ignore_encoding = ignore_encoding,
-    ignore_function_env = ignore_function_env
-  )
-}
 
 compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) {
   if (is_reference(x, y)) {
@@ -102,10 +105,16 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
   }
 
   # Compare type
-  term <- compare_terminate(x, y, paths, tolerance = opts$tolerance)
+  term <- compare_terminate(x, y, paths,
+    tolerance = opts$tolerance,
+    ignore_attr = opts$ignore_attr
+  )
   if (length(term) > 0) {
     return(term)
   }
+
+  x <- compare_proxy(x)
+  y <- compare_proxy(y)
 
   out <- character()
 
@@ -119,7 +128,12 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     out <- c(out, compare_character(is(x), is(y), glue("is({paths})")))
     out <- c(out, compare_by_slot(x, y, paths, opts))
   } else if (!opts$ignore_attr) {
-    if (is_closure(x) && opts$ignore_srcref) {
+    if (is_call(x) && opts$ignore_formula_env) {
+      attr(x, ".Environment") <- NULL
+      attr(y, ".Environment") <- NULL
+    }
+
+    if ((is_closure(x) || is_call(x)) && opts$ignore_srcref) {
       x <- remove_source(x)
       y <- remove_source(y)
     }
@@ -128,8 +142,11 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
   }
 
   # Then contents
-  if (is_list(x) || is_pairlist(x)) {
-    if (is_dictionaryish(x) && is_dictionaryish(y)) {
+  if (is_list(x) || is_pairlist(x) || is.expression(x)) {
+    x <- unclass(x)
+    y <- unclass(y)
+
+    if (!opts$ignore_attr && is_dictionaryish(x) && is_dictionaryish(y)) {
       out <- c(out, compare_by_name(x, y, paths, opts))
     } else {
       out <- c(out, compare_by_pos(x, y, paths, opts))
@@ -138,14 +155,14 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     if (env_has(x, ".__enclos_env__")) {
       # enclosing env of methods is object env
       opts$ignore_function_env <- TRUE
-      x_fields <- as.list(x, sort = TRUE)
-      y_fields <- as.list(y, sort = TRUE)
+      x_fields <- as.list(x, sorted = TRUE)
+      y_fields <- as.list(y, sorted = TRUE)
       x_fields$.__enclos_env__ <- NULL
       y_fields$.__enclos_env__ <- NULL
 
       out <- c(out, compare_structure(x_fields, y_fields, paths, opts = opts))
     } else {
-      out <- c(out, should_be("<env:{env_label(x)}>", "<env:{env_label(y)}>`"))
+      out <- c(out, should_be("<env:{env_label(x)}>", "<env:{env_label(y)}>"))
     }
   } else if (is_closure(x)) {
     if (opts$ignore_function_env) {
@@ -159,27 +176,35 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
   } else if (is_symbol(x)) {
     out <- c(out, should_be("`{deparse(x)}`", "`{deparse(y)}`"))
   } else if (is_call(x)) {
+    attributes(x) <- NULL
+    attributes(y) <- NULL
+
     if (!identical(x, y)) {
-      diff <- compare_character(deparse(x), deparse(y), paths)
+      diff <- compare_character(deparse(x), deparse(y), paths, quote = "`")
       if (length(diff) == 0) {
         diff <- glue("`deparse({paths[[1]]})` equals `deparse({paths[[2]]})`, but AST non-identical")
       }
       out <- c(out, diff)
     }
   } else if (is_atomic(x)) {
-
     if (is_character(x) && !opts$ignore_encoding) {
       out <- c(out, compare_character(Encoding(x), Encoding(y), glue("Encoding({paths})")))
     }
+    attributes(x) <- NULL
+    attributes(y) <- NULL
 
     out <- c(out, switch(typeof(x),
       integer = ,
       complex = ,
       double = compare_numeric(x, y, paths, tolerance = opts$tolerance),
-      logical = ,
+      logical = compare_logical(x, y, paths),
       raw = ,
       character = compare_character(x, y, paths)
     ))
+  } else if (typeof(x) == "externalptr") {
+    x <- utils::capture.output(print(x))
+    y <- utils::capture.output(print(y))
+    out <- c(out, should_be("{x}", "{y}"))
   } else if (!isS4(x)) {
     abort(glue("{paths[[1]]}: unsupported type {typeof(x)}"))
   }
@@ -187,8 +212,14 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
   out
 }
 
-compare_terminate <- function(x, y, paths, tolerance = NULL) {
+compare_terminate <- function(x, y, paths,
+                              tolerance = NULL,
+                              ignore_attr = FALSE) {
   if (type_of(x) == type_of(y)) {
+    return(character())
+  }
+
+  if (ignore_attr && (typeof(x) == typeof(y))) {
     return(character())
   }
 
@@ -249,12 +280,12 @@ compare_by <- function(index_fun, extract_fun, path_fun) {
 }
 
 index_name <- function(x, y) union(names(x), names(y))
-extract_name <- function(x, i) if (has_name(x, i)) x[[i]] else missing_arg()
+extract_name <- function(x, i) if (has_name(x, i)) .subset2(x, i) else missing_arg()
 path_name <- function(path, i) glue("{path}${i}")
 compare_by_name <- compare_by(index_name, extract_name, path_name)
 
-index_pos <- function(x, y) max(length(x), length(y))
-extract_pos <- function(x, i) if (i <= length(x)) x[[i]] else missing_arg()
+index_pos <- function(x, y) seq_len(max(length(x), length(y)))
+extract_pos <- function(x, i) if (i <= length(x)) .subset2(x, i) else missing_arg()
 path_pos <- function(path, i) glue("{path}[[{i}]]")
 compare_by_pos <- compare_by(index_pos, extract_pos, path_pos)
 

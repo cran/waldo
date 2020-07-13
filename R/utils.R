@@ -57,9 +57,6 @@ short_val <- function(x) {
 
 attrs <- function(x) {
   out <- attributes(x)
-  if (is.data.frame(x)) {
-    out$row.names <- .row_names_info(x, 0L)
-  }
 
   first <- intersect(c("class", "names", "dim"), names2(out))
   out[c(first, sort(setdiff(names2(out), first)))]
@@ -97,12 +94,25 @@ if (getRversion() < "3.3.0") {
   }
 }
 
-left_align <- function(x, width = NULL) {
+fansi_align <- function(x, width = NULL, justify = c("left", "right")) {
+  justify <- arg_match(justify)
+
   nchar <- fansi::nchar_ctl(x)
   width <- width %||% max(nchar)
   padding <- strrep(" ", pmax(0, width - nchar))
 
-  paste0(x, padding)
+  switch(justify,
+    left = paste0(x, padding),
+    right = paste0(padding, x)
+  )
+}
+
+split_by_line <- function(x) {
+  trailing_nl <- grepl("\n$", x)
+
+  x <- strsplit(x, "\n")
+  x[trailing_nl] <- lapply(x[trailing_nl], c, "")
+  x
 }
 
 multiline <- function(x) any(grepl("\n", x))

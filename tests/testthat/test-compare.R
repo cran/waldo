@@ -9,16 +9,62 @@ test_that("attributes compare by name", {
   expect_equal(compare_structure(x, y), character())
 })
 
+test_that("unnnamed lists compare all positions", {
+  x <- list(1, 2)
+  y <- list(3, 4)
+
+  expect_length(compare(x, y), 2)
+})
+
 test_that("can optionally ignore attributes", {
-  x <- structure(list(), a = "a")
-  y <- structure(list(), a = "b")
-  expect_equal(compare_structure(x, y, opts = compare_opts(ignore_attr = TRUE)), character())
+  opts <- compare_opts(ignore_attr = TRUE)
+
+  x <- y <- 1:5
+  attr(y, "a") <- "b"
+  expect_equal(compare_structure(x, y, opts = opts), character())
+
+  # Ignores class
+  class(y) <- "foofy"
+  expect_equal(compare_structure(x, y, opts = opts), character())
+
+  # Ignores names
+  x <- list(x = 1)
+  y <- list(y = 1)
+  expect_equal(compare_structure(x, y, opts = opts), character())
+})
+
+test_that("can optionally ignore function/formula envs", {
+  f1a <- y ~ x
+  f1b <- local(y ~ x)
+  expect_equal(compare(f1a, f1b, ignore_formula_env = TRUE), new_compare())
+
+  f2a <- function(x) x + 1
+  f2b <- local(function(x) x + 1)
+  expect_equal(compare(f2a, f2b, ignore_function_env = TRUE), new_compare())
+})
+
+test_that("don't strictly compare row names", {
+  df1 <- df2 <- data.frame(x = 1:2)
+  rownames(df2) <- 1:2
+  expect_equal(compare_structure(df1, df2), character())
 })
 
 test_that("can ignore minor numeric differences", {
   x <- 1:3
   expect_equal(compare_structure(x, as.numeric(x), opts = compare_opts(tolerance = 0)), character())
   expect_equal(compare_structure(x, x + 1e-9, opts = compare_opts(tolerance = 1e-6)), character())
+})
+
+test_that("ignores S3 [[ methods", {
+  verify_output(test_path("test-compare-s3-weird.txt"), {
+    x <- as.POSIXlt("2020-01-01")
+    y <- as.POSIXlt("2020-01-02")
+    compare(x, y)
+
+    x <- package_version("1.0.0")
+    y <- package_version("1.1.0")
+    compare(x, y)
+  })
 })
 
 test_that("can optionally compare encoding", {
@@ -81,6 +127,12 @@ test_that("comparing functions gives useful diffs", {
   })
 })
 
+test_that("can compare atomic vectors", {
+  verify_output(test_path("test-compare-atomic.txt"), {
+    compare(1:3, 10L + 1:3)
+    compare(c(TRUE, FALSE, NA, TRUE), c(FALSE, FALSE, FALSE))
+  })
+})
 
 test_that("can compare S3 objects", {
   verify_output(test_path("test-compare-s3.txt"), {
@@ -138,5 +190,8 @@ test_that("comparing language objects gives useful diffs", {
     x <- y <- quote(foo(1:3))
     y[[2]] <- 1:3
     compare(x, y)
+
+    compare(expression(1, a, a + b), expression(1, a, a + b))
+    compare(expression(1, a, a + b), expression(1, a, a + c))
   })
 })
