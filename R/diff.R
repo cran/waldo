@@ -61,6 +61,10 @@ diff_align <- function(diff, x, y) {
 
 # Only want to show slice if it's partial
 make_slice <- function(x, idx) {
+  if (all(is.na(idx))) {
+    return(NULL)
+  }
+
   idx <- range(idx, na.rm = TRUE)
   if (idx[[1]] <= 1 && idx[[2]] >= length(x)) {
     NULL
@@ -171,7 +175,7 @@ format_diff_matrix <- function(diff, x, y, paths,
     lines <- c(lines, switch(row$t,
       x = line_x(x[x_i]),
       a = c(line_x(x[x_i]), line_d(y[y_i])),
-      c = interleave(line_a(x[x_i]), line_d(y[y_i])),
+      c = interleave(line_d(y[y_i]), line_a(x[x_i])),
       d = line_a(x[x_i])
     ))
   }

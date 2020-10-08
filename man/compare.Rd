@@ -8,8 +8,8 @@ compare(
   x,
   y,
   ...,
-  x_arg = "x",
-  y_arg = "y",
+  x_arg = "old",
+  y_arg = "new",
   tolerance = NULL,
   ignore_srcref = TRUE,
   ignore_attr = FALSE,
@@ -32,7 +32,8 @@ backward compatability. These include:
 All other arguments are ignored with a warning.}
 
 \item{x_arg, y_arg}{Name of \code{x} and \code{y} arguments, used when generated paths
-to internal components.}
+to internal components. These default to "old" and "new" since it's
+most natural to supply the previous value then the new value.}
 
 \item{tolerance}{If non-\code{NULL}, used as threshold for ignoring small
 floating point difference when comparing numeric vectors. Setting to
@@ -50,10 +51,13 @@ with differences. Then we check that
 default since the \code{srcref} does not change the behaviour of a function,
 only its printed representation.}
 
-\item{ignore_attr}{Ignore all differences in attributes? Only provided
-for backward compatibility with \code{all.equal()}. Using \code{TRUE} is not
-generally recommended because it will ignore many important functional
-differences.}
+\item{ignore_attr}{Ignore differences in specified attributes?
+Supply a character vector to ignore differences in named attributes.
+
+For backward compatibility with \code{all.equal()}, you can also use \code{TRUE},
+to all ignore differences in all attributes. This is not generally
+recommended as it is a blunt tool that will ignore many important
+functional differences.}
 
 \item{ignore_encoding}{Ignore string encoding? \code{TRUE} by default, because
 this is R's default behaviour. Use \code{FALSE} when specifically concerned
