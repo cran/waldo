@@ -1,3 +1,10 @@
+# waldo 0.2.2
+
+* Handle S4 objects that have attributes that are not slots.
+
+* Additions are now coloured blue and deletions yellow (instead of the 
+  opposite).
+
 # waldo 0.2.1
 
 * `compare()` now labels output as `old` and `new`, since that's the most
