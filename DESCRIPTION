@@ -1,6 +1,6 @@
 Package: waldo
 Title: Find Differences Between R Objects
-Version: 0.2.2
+Version: 0.2.3
 Authors@R: 
     c(person(given = "Hadley",
              family = "Wickham",
@@ -22,9 +22,9 @@ LazyData: true
 RoxygenNote: 7.1.1
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2020-10-15 19:52:48 UTC; hadley
+Packaged: 2020-11-09 14:55:30 UTC; hadley
 Author: Hadley Wickham [aut, cre],
   RStudio [cph]
 Maintainer: Hadley Wickham <hadley@rstudio.com>
 Repository: CRAN
-Date/Publication: 2020-10-15 21:10:02 UTC
+Date/Publication: 2020-11-09 16:30:02 UTC

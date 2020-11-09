@@ -16,6 +16,18 @@ test_that("unnnamed lists compare all positions", {
   expect_length(compare(x, y), 2)
 })
 
+test_that("can control number of differences", {
+  x <- as.list(letters)
+  y <- as.list(LETTERS)
+  expect_snapshot(compare(x, y, max_diffs = 1))
+  expect_snapshot(compare(x, y, max_diffs = Inf))
+
+  expect_snapshot(compare(letters, LETTERS, max_diffs = 1))
+  expect_snapshot(compare(letters, LETTERS, max_diffs = 10))
+  expect_snapshot(compare(letters, LETTERS, max_diffs = 20))
+  expect_snapshot(compare(letters, LETTERS, max_diffs = Inf))
+})
+
 test_that("can optionally ignore attributes", {
   opts <- compare_opts(ignore_attr = TRUE)
 
@@ -54,11 +66,11 @@ test_that("can optionally ignore selected attributes", {
 test_that("can optionally ignore function/formula envs", {
   f1a <- y ~ x
   f1b <- local(y ~ x)
-  expect_equal(compare(f1a, f1b, ignore_formula_env = TRUE), new_compare())
+  expect_equal(length(compare(f1a, f1b, ignore_formula_env = TRUE)), 0)
 
   f2a <- function(x) x + 1
   f2b <- local(function(x) x + 1)
-  expect_equal(compare(f2a, f2b, ignore_function_env = TRUE), new_compare())
+  expect_equal(length(compare(f2a, f2b, ignore_function_env = TRUE)), 0)
 })
 
 test_that("don't strictly compare row names", {

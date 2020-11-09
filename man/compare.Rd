@@ -11,6 +11,7 @@ compare(
   x_arg = "old",
   y_arg = "new",
   tolerance = NULL,
+  max_diffs = if (in_ci()) Inf else 10,
   ignore_srcref = TRUE,
   ignore_attr = FALSE,
   ignore_encoding = TRUE,
@@ -47,6 +48,10 @@ with differences. Then we check that
 \code{mean(abs(x_diff - y_diff))} if \code{y_diff} is small) is less than
 \code{tolerance}.}
 
+\item{max_diffs}{Control the maximum number of differences shown. The
+default shows 10 differences when run interactively and all differences
+when run in CI. Set \code{max_diffs = Inf} to see all differences.}
+
 \item{ignore_srcref}{Ignore differences in function \code{srcref}s? \code{TRUE} by
 default since the \code{srcref} does not change the behaviour of a function,
 only its printed representation.}
@@ -70,8 +75,8 @@ environments.}
 }
 \value{
 A character vector with class "waldo_compare". If there are no
-differences it will have length 0; otherwise each element is contains
-the description of a single difference.
+differences it will have length 0; otherwise each element contains the
+description of a single difference.
 }
 \description{
 This compares two R objects, identifying the key differences. It:
