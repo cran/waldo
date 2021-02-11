@@ -150,8 +150,8 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     }
 
     if ((is_closure(x) || is_call(x)) && opts$ignore_srcref) {
-      x <- remove_source(x)
-      y <- remove_source(y)
+      x <- zap_srcref(x)
+      y <- zap_srcref(y)
     }
 
     out <- c(out, compare_by_attr(attrs(x, opts$ignore_attr), attrs(y, opts$ignore_attr), paths, opts))
@@ -203,7 +203,8 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
         max_diffs = opts$max_diffs
       )
       if (length(diff) == 0) {
-        diff <- glue("`deparse({paths[[1]]})` equals `deparse({paths[[2]]})`, but AST non-identical")
+        # Fallback if deparse equal but AST different
+        diff <- compare_structure(as.list(x), as.list(y), paths, opts = opts)
       }
       out <- c(out, diff)
     }
@@ -242,7 +243,8 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
 compare_terminate <- function(x, y, paths,
                               tolerance = NULL,
                               ignore_attr = FALSE) {
-  if (type_of(x) == type_of(y)) {
+
+  if (typeof(x) == typeof(y) && oo_type(x) == oo_type(y)) {
     return(character())
   }
 
