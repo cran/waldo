@@ -38,6 +38,49 @@ friendly_type_of <- function(x) {
   }
 }
 
+friendly_type <- function(type) {
+  switch(type,
+    logical = "a logical vector",
+    integer = "an integer vector",
+    numeric = ,
+    double = "a double vector",
+    complex = "a complex vector",
+    character = "a character vector",
+    raw = "a raw vector",
+    string = "a string",
+    list = "a list",
+
+    NULL = "NULL",
+    environment = "an environment",
+    externalptr = "a pointer",
+    weakref = "a weak reference",
+    S4 = "an S4 object",
+
+    name = ,
+    symbol = "a symbol",
+    language = "a call",
+    pairlist = "a pairlist node",
+    expression = "an expression vector",
+    quosure = "a quosure",
+    formula = "a formula",
+
+    char = "an internal string",
+    promise = "an internal promise",
+    ... = "an internal dots object",
+    any = "an internal `any` object",
+    bytecode = "an internal bytecode object",
+
+    primitive = ,
+    builtin = ,
+    special = "a primitive function",
+    closure = "a function",
+
+    type
+  )
+}
+
+
+
 short_val <- function(x) {
   if (is.object(x) || !is_atomic(x)) {
     return("")
@@ -103,3 +146,30 @@ split_by_line <- function(x) {
 multiline <- function(x) any(grepl("\n", x))
 
 default_tol <- function() .Machine$double.eps^0.5
+
+merge_lists <- function(...) {
+  all <- compact(list(...))
+  Reduce(utils::modifyList, all, init = list())
+}
+
+compact <- function(x) {
+  is_null <- vapply(x, is.null, logical(1))
+  x[!is_null]
+}
+
+as_map <- function(x) {
+  # Remove nulls
+  is_null <- vapply(x, is.null, logical(1))
+  x <- x[!is_null]
+
+  # Sort named components, preserving positions of unnamed
+  nx <- names2(x)
+  is_named <- nx != ""
+  if (any(is_named)) {
+    idx <- seq_along(x)
+    idx[is_named] <- idx[is_named][order(nx[is_named])]
+    x <- x[idx]
+  }
+
+  x
+}

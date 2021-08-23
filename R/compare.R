@@ -13,6 +13,37 @@
 #'
 #' `compare()` is an alternative to [all.equal()].
 #'
+#' @section Controlling comparisons:
+#'
+#' There are two ways for an object (rather than the person calling `compare()`
+#' or `expect_equal()` to control how it is compared to other objects.
+#' First, if the object has an S3 class, you can provide a [compare_proxy()]
+#' method that provides an alternative representation of the object; this is
+#' particularly useful if important data is stored outside of R, e.g. in
+#' an external pointer.
+#'
+#' Alternatively, you can attach an attribute called `"waldo_opts"` to your
+#' object. This should be a list of compare options, using the same names
+#' and possible values as the arguments to this function. This option
+#' is ignored by default (`ignore_attr`) so that you can set the options in
+#' the object that you control. (If you don't want to see the attributes
+#' interactively, you could attach them in a [compare_proxy()] method.)
+#'
+#' Options supplied in this way also affect all the children. This means
+#' options are applied in the following order, from lowest to highest
+#' precedence:
+#'
+#' 1.  Defaults from `compare()`.
+#' 1.  The `waldo_opts` for the parents of `x`.
+#' 1.  The `waldo_opts` for the parents of `y`.
+#' 1.  The `waldo_opts` for `x`.
+#' 1.  The `waldo_opts` for `y`.
+#' 1.  User-specified arguments to `compare()`.
+#'
+#' Use these techniques with care. If you accidentally cover up an important
+#' difference you can create a confusing situation where `x` and `y` behave
+#' differently but `compare()` reports no differences in the underlying objects.
+#'
 #' @param x,y Objects to compare. `y` is treated as the reference object
 #'   so messages describe how `x` is different to `y`
 #' @param x_arg,y_arg Name of `x` and `y` arguments, used when generated paths
@@ -44,6 +75,9 @@
 #'   only its printed representation.
 #' @param ignore_attr Ignore differences in specified attributes?
 #'   Supply a character vector to ignore differences in named attributes.
+#'   By default the `"waldo_opts"` attribute is listed in `ignore_attr` so
+#'   that changes to it are not reported; if you customize `ignore_attr`, you
+#'   will probably want to do this yourself.
 #'
 #'   For backward compatibility with `all.equal()`, you can also use `TRUE`,
 #'   to all ignore differences in all attributes. This is not generally
@@ -56,6 +90,9 @@
 #' @param ignore_encoding Ignore string encoding? `TRUE` by default, because
 #'   this is R's default behaviour. Use `FALSE` when specifically concerned
 #'   with the encoding, not just the value of the string.
+#' @param list_as_map Compare lists as if they are mappings between names and
+#'   values. Concretely, this drops `NULLs` in both objects and sorts named
+#'   components.
 #' @returns A character vector with class "waldo_compare". If there are no
 #'   differences it will have length 0; otherwise each element contains the
 #'   description of a single difference.
@@ -82,15 +119,17 @@
 #' # Otherwise they're compared by position
 #' compare(list("x", "y"), list("x", "z"))
 #' compare(list(x = "x", x = "y"), list(x = "x", y = "z"))
+#'
 compare <- function(x, y, ...,
                     x_arg = "old", y_arg = "new",
                     tolerance = NULL,
                     max_diffs = if (in_ci()) Inf else 10,
                     ignore_srcref = TRUE,
-                    ignore_attr = FALSE,
+                    ignore_attr = "waldo_opts",
                     ignore_encoding = TRUE,
                     ignore_function_env = FALSE,
-                    ignore_formula_env = FALSE
+                    ignore_formula_env = FALSE,
+                    list_as_map = FALSE
                     ) {
 
   opts <- compare_opts(
@@ -101,15 +140,35 @@ compare <- function(x, y, ...,
     ignore_attr = ignore_attr,
     ignore_encoding = ignore_encoding,
     ignore_formula_env = ignore_formula_env,
-    ignore_function_env = ignore_function_env
+    ignore_function_env = ignore_function_env,
+    list_as_map = list_as_map
   )
+  # Record options overridden by user
+  opts$user_specified <- intersect(names(opts), names(match.call()))
+
   out <- compare_structure(x, y, paths = c(x_arg, y_arg), opts = opts)
   new_compare(out, max_diffs)
 }
 
-
 compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) {
-  if (is_reference(x, y)) {
+  if (!is_missing(x)) {
+    proxy <- compare_proxy(x, paths[[1]])
+    x <- proxy$object
+    paths[[1]] <- proxy$path
+  }
+  if (!is_missing(y)) {
+    proxy <- compare_proxy(y, paths[[2]])
+    y <- proxy$object
+    paths[[2]] <- proxy$path
+  }
+
+  opts <- merge_lists(opts,
+    attr(x, "waldo_opts"),
+    attr(y, "waldo_opts"),
+    opts[opts$user_specified]
+  )
+
+  if (is_identical(x, y, opts)) {
     return(character())
   }
 
@@ -122,8 +181,10 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     return(term)
   }
 
-  x <- compare_proxy(x)
-  y <- compare_proxy(y)
+  if (is_list(x) && opts$list_as_map) {
+    x <- as_map(x)
+    y <- as_map(y)
+  }
 
   out <- character()
 
@@ -159,6 +220,10 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
 
   # Then contents
   if (is_list(x) || is_pairlist(x) || is.expression(x)) {
+    if (is.data.frame(x) && is.data.frame(y)) {
+      out <- c(out, compare_data_frame(x, y, paths, opts = opts))
+    }
+
     x <- unclass(x)
     y <- unclass(y)
 
@@ -168,14 +233,18 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     } else {
       out <- c(out, compare_by_pos(x, y, paths, opts))
     }
+
   } else if (is_environment(x)) {
     if (env_has(x, ".__enclos_env__")) {
       # enclosing env of methods is object env
       opts$ignore_function_env <- TRUE
-      x_fields <- as.list(x, sorted = TRUE)
-      y_fields <- as.list(y, sorted = TRUE)
+      x_fields <- as.list(x)
+      y_fields <- as.list(y)
       x_fields$.__enclos_env__ <- NULL
       y_fields$.__enclos_env__ <- NULL
+      # Can't use as.list(sorted = TRUE), https://github.com/r-lib/waldo/issues/84
+      x_fields <- x_fields[order(names(x_fields))]
+      y_fields <- y_fields[order(names(y_fields))]
 
       out <- c(out, compare_structure(x_fields, y_fields, paths, opts = opts))
     } else {
@@ -215,8 +284,6 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
         max_diffs = opts$max_diffs
       ))
     }
-    attributes(x) <- NULL
-    attributes(y) <- NULL
 
     out <- c(out, switch(typeof(x),
       integer = ,
@@ -240,9 +307,42 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
   out
 }
 
+# Fast path for "identical" elements - in the long run we'd eliminate this
+# by re-writing all of waldo in C, but this gives us a nice performance boost
+# with for a relatively low cost in the meantime.
+is_identical <- function(x, y, opts) {
+  # These comparisons aren't 100% correct because they don't affect comparison
+  # of character vectors/functions further down the tree. But I think that's
+  # unlikely to have an impact in practice since they're opt-in.
+  if (is_character(x) && is_character(y) && !opts$ignore_encoding) {
+    identical(x, y) && identical(Encoding(x), Encoding(y))
+  } else if (is_function(x) && is_function(y) && !opts$ignore_srcref) {
+    identical(x, y) && identical(attr(x, "srcref"), attr(y, "srcref"))
+  } else {
+    identical(x, y)
+  }
+}
+
 compare_terminate <- function(x, y, paths,
                               tolerance = NULL,
                               ignore_attr = FALSE) {
+  type_x <- friendly_type_of(x)
+  type_y <- friendly_type_of(y)
+  if (is_missing(x) && !is_missing(y)) {
+    type_y <- col_d(type_y)
+  } else if (!is_missing(x) && is_missing(y)) {
+    type_x <- col_a(type_x)
+  } else {
+    type_x <- col_c(type_x)
+    type_y <- col_c(type_y)
+  }
+
+  type_mismatch_msg <- should_be("{type_x}{short_val(x)}", "{type_y}{short_val(y)}")
+
+  # missing needs to be treated here because `typeof(missing_arg())` is symbol
+  if (is_missing(x) != is_missing(y)) {
+    return(type_mismatch_msg)
+  }
 
   if (typeof(x) == typeof(y) && oo_type(x) == oo_type(y)) {
     return(character())
@@ -261,18 +361,7 @@ compare_terminate <- function(x, y, paths,
     return(should_be("`{deparse(x)}`", "`{deparse(y)}`"))
   }
 
-  type_x <- friendly_type_of(x)
-  type_y <- friendly_type_of(y)
-  if (is_missing(x) && !is_missing(y)) {
-    type_y <- col_d(type_y)
-  } else if (!is_missing(x) && is_missing(y)) {
-    type_x <- col_a(type_x)
-  } else {
-    type_x <- col_c(type_x)
-    type_y <- col_c(type_y)
-  }
-
-  should_be("{type_x}{short_val(x)}", "{type_y}{short_val(y)}")
+  type_mismatch_msg
 }
 
 should_be <- function(x, y) {
@@ -320,6 +409,9 @@ compare_by_pos <- compare_by(index_pos, extract_pos, path_pos)
 
 path_line <- function(path, i) glue("lines({path}[[{i}]])")
 compare_by_line <- compare_by(index_pos, extract_pos, path_line)
+
+path_line1 <- function(path, i) glue("lines({path})")
+compare_by_line1 <- compare_by(index_pos, extract_pos, path_line1)
 
 path_attr <- function(path, i) {
   # from ?attributes, excluding row.names() because it's not a simple accessor

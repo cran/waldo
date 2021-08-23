@@ -2,8 +2,7 @@ compare_logical <- function(x, y, paths = c("x", "y"), max_diffs = Inf) {
   diff_element(
     encodeString(x), encodeString(y), paths,
     quote = NULL,
-    max_diffs = max_diffs,
-    elementwise = TRUE
+    max_diffs = max_diffs
   )
 }
 
@@ -13,7 +12,12 @@ compare_character <- function(x, y, paths = c("x", "y"), quote = "\"", max_diffs
     y <- split_by_line(y)
 
     opts <- compare_opts(max_diffs = max_diffs)
-    new_compare(compare_by_line(x, y, paths, opts))
+
+    if (length(x) == 1 && length(y) == 1) {
+      new_compare(compare_by_line1(x, y, paths, opts))
+    } else {
+      new_compare(compare_by_line(x, y, paths, opts))
+    }
   } else {
     diff_element(x, y, paths, quote = quote, max_diffs = max_diffs)
   }
@@ -22,6 +26,15 @@ compare_character <- function(x, y, paths = c("x", "y"), quote = "\"", max_diffs
 compare_numeric <- function(x, y, paths = c("x", "y"), tolerance = default_tol(), max_diffs = Inf) {
   if (num_equal(x, y, tolerance)) {
     return(new_compare())
+  }
+
+  if (!is.null(dim(x)) && identical(dim(x), dim(y))) {
+    rows <- printed_rows(x, y, paths = paths)
+    out <- diff_rows(rows, paths = paths, max_diffs = max_diffs)
+
+    if (length(out) > 0) {
+      return(out)
+    }
   }
 
   if (length(x) == length(y)) {
@@ -40,6 +53,7 @@ compare_numeric <- function(x, y, paths = c("x", "y"), tolerance = default_tol()
     justify = "right",
     max_diffs = max_diffs
   )
+
   if (length(out) > 0) {
     out
   } else {
@@ -55,6 +69,9 @@ num_exact <- function(x, digits = 6) {
 
 # Minimal number of digits needed to show differences
 min_digits <- function(x, y) {
+  attributes(x) <- NULL
+  attributes(y) <- NULL
+
   digits(abs(x - y))
 }
 

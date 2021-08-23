@@ -1,5 +1,5 @@
 test_that("paired diffs", {
-  verify_output(test_path("test-diff-paired.txt"), {
+  expect_snapshot({
     "no difference"
     diff_element(c("a", "b"), c("a", "b"))
 
@@ -25,7 +25,7 @@ test_that("paired diffs", {
 })
 
 test_that("side-by-side diffs", {
-  verify_output(test_path("test-diff-side-by-side.txt"), {
+  expect_snapshot({
     x <- c("a", "a")
     diff_element(c(x, "a", "b", "c"), c(x, "a", "b"), width = 20)
     diff_element(c(x, "a", "b"), c(x, "a", "b", "c"), width = 20)
@@ -37,12 +37,21 @@ test_that("side-by-side diffs", {
 })
 
 test_that("element-wise diffs", {
-  verify_output(test_path("test-diff-element-wise.txt"), {
+  expect_snapshot({
     diff_element(c("a", "b", "c", "d"), c("a", "b"), width = 10)
     diff_element(c("a", "b"), c("a", "b", "c", "d"), width = 10)
     diff_element(c("a", "B", "C", "d"), c("a", "b", "c", "d"), width = 10)
 
     "context"
     diff_element(c(letters, "a", "b"), c(letters, "a", "b", "c"), width = 10)
+  })
+})
+
+test_that("only interleave if change has equal number of lines", {
+  expect_snapshot({
+    x <- letters # to anchor diffs
+    diff_element(c(x, 1:2, x), c(x, -(1:2), x), width = 10)
+    diff_element(c(x, 1:3, x), c(x, -(1:2), x), width = 10)
+    diff_element(c(x, 1:2, x), c(x, -(1:3), x), width = 10)
   })
 })
