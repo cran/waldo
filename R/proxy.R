@@ -7,9 +7,9 @@
 #'
 #' waldo comes with methods for a few common cases:
 #'
-#' * data.table: the `.internal.selfref` attribute is set to `NULL`. This is
-#'   an external pointer that is used for performance optimisation, and
-#'   doesn't affect the data.
+#' * data.table: the `.internal.selfref` and `index` attributes
+#'   are set to `NULL`. Both attributes are used for performance optimisation, and
+#'   don't affect the data.
 #'
 #' * `xml2::xml_node`: the underlying XML data is stored in memory in C,
 #'   behind an external pointer, so the we best can do is to convert the
@@ -28,6 +28,10 @@
 #' * `path`: an updated path showing what modification was applied
 #' @export
 compare_proxy <- function(x, path = "x") {
+  if (typeof(x) == "char") {
+    return(list(object = x, path = path))
+  }
+
   UseMethod("compare_proxy")
 }
 
@@ -39,6 +43,7 @@ compare_proxy.default <- function(x, path) {
 #' @export
 compare_proxy.data.table <- function(x, path) {
   attr(x, ".internal.selfref") <- NULL
+  attr(x, "index") <- NULL
   list(object = x, path = path)
 }
 
@@ -49,7 +54,7 @@ compare_proxy.xml_node <- function(x, path) {
 
 # RProtoBuf objects -------------------------------------------------------
 compare_protobuf <- function(x, path) {
-  list(object = x$toString, path = paste0(path, "$toString()"))
+  list(object = x$toString(), path = paste0(path, "$toString()"))
 }
 #' @export
 compare_proxy.Message <- compare_protobuf

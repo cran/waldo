@@ -44,13 +44,13 @@
 #' difference you can create a confusing situation where `x` and `y` behave
 #' differently but `compare()` reports no differences in the underlying objects.
 #'
-#' @param x,y Objects to compare. `y` is treated as the reference object
-#'   so messages describe how `x` is different to `y`
+#' @param x,y Objects to compare. `x` is treated as the reference object
+#'   so messages describe how `y` is different to `x`.
 #' @param x_arg,y_arg Name of `x` and `y` arguments, used when generated paths
 #'   to internal components. These default to "old" and "new" since it's
 #'   most natural to supply the previous value then the new value.
 #' @param ... A handful of other arguments are supported with a warning for
-#'   backward compatability. These include:
+#'   backward comparability. These include:
 #'
 #'   * `all.equal()` arguments `checkNames` and `check.attributes`
 #'   * `testthat::compare()` argument `tol`
@@ -235,20 +235,32 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     }
 
   } else if (is_environment(x)) {
-    if (env_has(x, ".__enclos_env__")) {
-      # enclosing env of methods is object env
-      opts$ignore_function_env <- TRUE
-      x_fields <- as.list(x)
-      y_fields <- as.list(y)
-      x_fields$.__enclos_env__ <- NULL
-      y_fields$.__enclos_env__ <- NULL
-      # Can't use as.list(sorted = TRUE), https://github.com/r-lib/waldo/issues/84
-      x_fields <- x_fields[order(names(x_fields))]
-      y_fields <- y_fields[order(names(y_fields))]
-
-      out <- c(out, compare_structure(x_fields, y_fields, paths, opts = opts))
-    } else {
+    if (is_seen(list(x, y), opts$seen$envs)) {
+      # Only report difference between pairs of environments once
+      return(out)
+    } else if (is_named_env(x) || is_named_env(y)) {
+      # Compare by reference
       out <- c(out, should_be("<env:{env_label(x)}>", "<env:{env_label(y)}>"))
+    } else {
+      # Compare by value
+      x_fields <- as.list.environment(x, all.names = TRUE)
+      y_fields <- as.list.environment(y, all.names = TRUE)
+      # Can't use as.list(sorted = TRUE), https://github.com/r-lib/waldo/issues/84
+      if (length(x_fields) > 0) x_fields <- x_fields[order(names(x_fields))]
+      if (length(y_fields) > 0) y_fields <- y_fields[order(names(y_fields))]
+
+      if (env_has(x, ".__enclos_env__")) {
+        # enclosing env of R6 methods is object env
+        opts$ignore_function_env <- TRUE
+        x_fields$.__enclos_env__ <- NULL
+        y_fields$.__enclos_env__ <- NULL
+      }
+
+      opts$seen$envs <- c(opts$seen$envs, list(list(x, y)))
+      out <- c(out, compare_structure(x_fields, y_fields, paths, opts = opts))
+      out <- c(out, compare_structure(
+        parent.env(x), parent.env(y), paste0("parent.env(", paths, ")"), opts = opts)
+      )
     }
   } else if (is_closure(x)) {
     if (opts$ignore_function_env) {
@@ -285,26 +297,36 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
       ))
     }
 
-    out <- c(out, switch(typeof(x),
-      integer = ,
-      complex = ,
-      double = compare_numeric(x, y, paths,
-        tolerance = opts$tolerance,
-        max_diffs = opts$max_diffs
-      ),
-      logical = compare_logical(x, y, paths, max_diffs = opts$max_diffs),
-      raw = ,
-      character = compare_character(x, y, paths, max_diffs = opts$max_diffs)
-    ))
+    out <- c(out, compare_vector(x, y, paths = paths, opts = opts))
   } else if (typeof(x) == "externalptr") {
     x <- utils::capture.output(print(x))
     y <- utils::capture.output(print(y))
     out <- c(out, should_be("{x}", "{y}"))
-  } else if (!isS4(x)) {
-    abort(glue("{paths[[1]]}: unsupported type {typeof(x)}"))
+  } else if (typeof(x) == "char") {
+    x <- paste0("CHARSXP: ", deparse(x))
+    y <- paste0("CHARSXP: ", deparse(y))
+    out <- c(out, should_be("{x}", "{y}"))
+  } else if (typeof(x) == "...") {
+    # Unevaluated dots are unlikely to lead to any significant differences
+    # in behaviour (they're usually captured incidentally) so we just
+    # ignore
+  } else if (typeof(x) != "S4") {
+    abort(glue("{paths[[1]]}: unsupported type {typeof(x)}"), call = NULL)
   }
 
   out
+}
+
+is_named_env <- function(x) {
+  environmentName(x) != ""
+}
+is_seen <- function(x, envs) {
+  for (env in envs) {
+    if (identical(x, env)) {
+      return(TRUE)
+    }
+  }
+  FALSE
 }
 
 # Fast path for "identical" elements - in the long run we'd eliminate this

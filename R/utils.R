@@ -34,7 +34,7 @@ friendly_type_of <- function(x) {
       )
     }
   } else {
-    paste0("an S4 object of class <", is(x), ">")
+    paste0("an S4 object of class <", class(x), ">")
   }
 }
 
@@ -172,4 +172,8 @@ as_map <- function(x) {
   }
 
   x
+}
+
+scrub_environment <- function(x) {
+  gsub("<env:0x[0-9a-f]+>", "<env: 0x********>", x)
 }
