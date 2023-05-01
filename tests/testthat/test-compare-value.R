@@ -23,6 +23,10 @@ test_that("character comparison", {
   })
 })
 
+test_that("NA and 'NA' compare differently", {
+  expect_snapshot(compare(NA_character_, "NA"))
+})
+
 test_that("multiline comparison", {
   expect_snapshot({
     compare_character("A\nthe apple is red\nC\n", "A\nthe apple was red\nC\n")
@@ -85,6 +89,18 @@ test_that("numeric comparison", {
   })
 })
 
+test_that("NAs are shown regardless of position", {
+  expect_snapshot({
+    compare(c(NA, 1, 2), c(1, 2))
+    compare(c(1, NA, 2), c(1, 2))
+    compare(c(1, 2, NA), c(1, 2))
+  })
+})
+
+test_that("informative difference between NA and NaN", {
+  expect_snapshot(compare_numeric(NA_real_, NaN))
+})
+
 test_that("numeric comparison works on factors", {
   expect_snapshot({
     f1 <- factor(c("a", "b", "c"))
@@ -100,6 +116,14 @@ test_that("shows row-by-row diff for numeric matrices", {
   expect_snapshot({
     x <- y <- matrix(1:4, nrow = 2)
     y[2, 2] <- 5L
+    compare(x, y)
+  })
+})
+
+test_that("but not for arrays", {
+  expect_snapshot({
+    x <- y <- array(1:4, c(1, 2, 2))
+    y[1, 2, 2] <- 5L
     compare(x, y)
   })
 })
@@ -133,6 +157,13 @@ test_that("don't use format if numeric & within tolerance", {
   expect_snapshot({
     compare(dt, dt + 5)
     compare(dt, dt + 5, tolerance = 1e-8)
+  })
+})
+
+test_that("can compare complex numbers", {
+  expect_snapshot({
+    compare(1:2 + 1i, 2 + 1i)
+    compare(1:2 + 1i, 1:2 + 2i)
   })
 })
 

@@ -176,6 +176,14 @@
       `attr(old, 'b')` is absent
       `attr(new, 'b')` is a character vector ('b')
 
+# can ignore class attribute
+
+    Code
+      compare(one_a, 1L, ignore_attr = "class")
+    Output
+      `old` is an S3 object of class <a>, a double vector
+      `new` is an integer vector (1)
+
 # ignores S3 [[ methods
 
     Code
@@ -687,4 +695,14 @@
     Output
       `proxy(old)$x`: 1
       `proxy(new)$x`: 2
+
+# can opt out of string quoting
+
+    Code
+      compare(c("a", "b", "c"), c("a", "b", "d"), quote_strings = FALSE)
+    Output
+          old | new    
+      [1] a   | a   [1]
+      [2] b   | b   [2]
+      [3] c   - d   [3]
 

@@ -19,7 +19,7 @@
 #'   data in memory in C++ and only expose string names to R. Fortunately,
 #'   these have well-understood string representations that we can use for
 #'   comparisons. See
-#'   <https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.text_format>
+#'   <https://protobuf.dev/reference/cpp/api-docs/google.protobuf.text_format/>
 #'
 #' @param x An object.
 #' @param path Path
@@ -50,6 +50,15 @@ compare_proxy.data.table <- function(x, path) {
 #' @export
 compare_proxy.xml_node <- function(x, path) {
   list(object = as.character(x), path = paste0("as.character(", path, ")"))
+}
+
+#' @export
+compare_proxy.POSIXlt <- function(x, path) {
+  # From R 4.3: More experimentally, a ‘"POSIXlt"’ object may have an attribute
+  # ‘"balanced"’ indicating if it is known to be filled or fully balanced.
+  # This is a performance optimisation that waldo can ignore.
+  attr(x, "balanced") <- NULL
+  list(object = x, path = path)
 }
 
 # RProtoBuf objects -------------------------------------------------------

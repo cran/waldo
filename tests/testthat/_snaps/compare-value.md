@@ -52,6 +52,14 @@
       `old[18:26]`: "r" "s" "t" "u" "v" "w" "x" "y" "z"
       `new[18:21]`: "r" "s" "t" "a"                    
 
+# NA and 'NA' compare differently
+
+    Code
+      compare(NA_character_, "NA")
+    Output
+      `old`: NA  
+      `new`: "NA"
+
 # multiline comparison
 
     Code
@@ -202,8 +210,34 @@
       # unequal length
       compare_numeric(c(1, 2, NA), c(1, 2 + 1e-07, NA, 3))
     Output
-      `x[2:3]`: 2             
-           `y`: 1 2.0000001  3
+      `x[2:3]`: 2              NA
+           `y`: 1 2.0000001 NA  3
+
+# NAs are shown regardless of position
+
+    Code
+      compare(c(NA, 1, 2), c(1, 2))
+    Output
+      `old`: NA 1 2
+      `new`:    1 2
+    Code
+      compare(c(1, NA, 2), c(1, 2))
+    Output
+      `old`: 1 NA 2
+      `new`: 1    2
+    Code
+      compare(c(1, 2, NA), c(1, 2))
+    Output
+      `old`: 1 2 NA
+      `new`: 1 2   
+
+# informative difference between NA and NaN
+
+    Code
+      compare_numeric(NA_real_, NaN)
+    Output
+      `x`:  NA
+      `y`: NaN
 
 # numeric comparison works on factors
 
@@ -236,6 +270,16 @@
         old[1, ]    1    3
       - old[2, ]    2    4
       + new[2, ]    2    5
+
+# but not for arrays
+
+    Code
+      x <- y <- array(1:4, c(1, 2, 2))
+      y[1, 2, 2] <- 5L
+      compare(x, y)
+    Output
+      `old`: 1 2 3 4
+      `new`: 1 2 3 5
 
 # falls back to regular display if printed representation the same
 
@@ -302,6 +346,19 @@
       compare(dt, dt + 5, tolerance = 1e-08)
     Output
       v No differences
+
+# can compare complex numbers
+
+    Code
+      compare(1:2 + 0+1i, 2 + 0+1i)
+    Output
+      `old`: 1+1i 2+1i
+      `new`:      2+1i
+    Code
+      compare(1:2 + 0+1i, 1:2 + 0+2i)
+    Output
+      `Im(old)`: 1 1
+      `Im(new)`: 2 2
 
 # logical comparisons minimise extraneous diffs
 

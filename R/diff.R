@@ -19,16 +19,16 @@ diff_align <- function(diff, x, y) {
     }
 
     x_out <- c(x_out, switch(row$t,
-      a = c(col_x(x[x_i]), NA[y_i]),
-      c = col_c(x[x_i]),
-      d = col_d(x[x_i]),
-      x = col_x(x[x_i])
+      a = col_x(extract(x, c(x_i, NA[y_i]))),
+      c = col_c(extract(x, x_i)),
+      d = col_d(extract(x, x_i)),
+      x = col_x(extract(x, x_i))
     ))
     y_out <- c(y_out, switch(row$t,
-      a = col_a(y[y_i]),
-      c = col_c(y[y_i]),
-      d = c(col_x(y[y_i]), NA[x_i]),
-      x = col_x(y[y_i])
+      a = col_a(extract(y, y_i)),
+      c = col_c(extract(y, y_i)),
+      d = col_x(extract(y, c(y_i, NA[x_i]))),
+      x = col_x(extract(y, y_i))
     ))
 
     x_idx <- c(x_idx, x_i[x_i != 0], if (row$t == "a") NA[y_i])
@@ -59,6 +59,12 @@ diff_align <- function(diff, x, y) {
   )
 }
 
+extract <- function(x, idx) {
+  out <- x[idx]
+  out[is.na(idx)] <- ""
+  out
+}
+
 # Only want to show slice if it's partial
 make_slice <- function(x, idx) {
   if (all(is.na(idx))) {
@@ -73,11 +79,10 @@ make_slice <- function(x, idx) {
   }
 }
 
-col_a <- function(x) ifelse(is.na(x), NA, cli::col_blue(x))
-col_d <- function(x) ifelse(is.na(x), NA, cli::col_yellow(x))
-col_c <- function(x) ifelse(is.na(x), NA, cli::col_green(x))
-col_x <- function(x) ifelse(is.na(x), NA, cli::col_grey(x))
-
+col_a <- function(x) cli::col_blue(x)
+col_d <- function(x) cli::col_yellow(x)
+col_c <- function(x) cli::col_green(x)
+col_x <- function(x) cli::col_grey(x)
 
 # values ------------------------------------------------------------------
 
@@ -85,15 +90,19 @@ diff_element <- function(x, y, paths = c("x", "y"),
                          quote = "\"",
                          justify = "left",
                          max_diffs = 10,
-                         width = getOption("width")) {
+                         width = getOption("width"),
+                         is_string = FALSE) {
+
+  # Must quote before comparison to ensure that "NA" and NA_character
+  # have different representation
+  if (!is.null(quote)) {
+    x <- encodeString(unclass(x), quote = quote)
+    y <- encodeString(unclass(y), quote = quote)
+  }
+
   diff <- ses_shortest(x, y)
   if (length(diff) == 0) {
     return(new_compare())
-  }
-
-  if (!is.null(quote)) {
-    x <- encodeString(x, quote = quote)
-    y <- encodeString(y, quote = quote)
   }
 
   format <- lapply(diff, format_diff_matrix,
@@ -102,7 +111,9 @@ diff_element <- function(x, y, paths = c("x", "y"),
     paths = paths,
     justify = justify,
     width = width,
-    max_diffs = max_diffs
+    max_diffs = max_diffs,
+    # Paired comparisons are confusing for unquoted strings
+    use_paired = !is_string || !is.null(quote)
   )
   new_compare(unlist(format, recursive = FALSE))
 }
@@ -110,10 +121,10 @@ diff_element <- function(x, y, paths = c("x", "y"),
 format_diff_matrix <- function(diff, x, y, paths,
                                justify = "left",
                                width = getOption("width"),
-                               max_diffs = 10) {
+                               max_diffs = 10,
+                               use_paired = TRUE) {
   alignment <- diff_align(diff, x, y)
   mat <- rbind(alignment$x, alignment$y)
-  mat[is.na(mat)] <- ""
 
   n <- min(ncol(mat), max_diffs)
   n_trunc <- ncol(mat) - n
@@ -123,16 +134,18 @@ format_diff_matrix <- function(diff, x, y, paths,
   y_path_label <- label_path(paths[[2]], alignment$y_slice)
 
   # Paired lines ---------------------------------------------------------------
-  mat_out <- cbind(paste0("`", c(x_path_label, y_path_label), "`:"), mat)
-  if (n_trunc > 0) {
-    mat_out <- mat_out[, seq_len(n + 1)]
-    mat_out <- cbind(mat_out, c(paste0("and ", n_trunc, " more..."), "..."))
-  }
-  out <- apply(mat_out, 2, fansi_align, justify = justify)
-  rows <- apply(out, 1, paste, collapse = " ")
+  if (use_paired) {
+    mat_out <- cbind(paste0("`", c(x_path_label, y_path_label), "`:"), mat)
+    if (n_trunc > 0) {
+      mat_out <- mat_out[, seq_len(n + 1)]
+      mat_out <- cbind(mat_out, c(paste0("and ", n_trunc, " more..."), "..."))
+    }
+    out <- apply(mat_out, 2, fansi_align, justify = justify)
+    rows <- apply(out, 1, paste, collapse = " ")
 
-  if (fansi::nchar_ctl(rows[[1]]) <= width) {
-    return(paste0(rows, collapse = "\n"))
+    if (fansi::nchar_ctl(rows[[1]]) <= width) {
+      return(paste0(rows, collapse = "\n"))
+    }
   }
 
   # Side-by-side ---------------------------------------------------------------
