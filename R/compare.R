@@ -92,7 +92,7 @@
 #'   this is R's default behaviour. Use `FALSE` when specifically concerned
 #'   with the encoding, not just the value of the string.
 #' @param list_as_map Compare lists as if they are mappings between names and
-#'   values. Concretely, this drops `NULLs` in both objects and sorts named
+#'   values. Concretely, this drops `NULL`s in both objects and sorts named
 #'   components.
 #' @param quote_strings Should strings be surrounded by quotes? If `FALSE`,
 #'   only side-by-side and line-by-line comparisons will be used, and there's
@@ -136,6 +136,20 @@ compare <- function(x, y, ...,
                     list_as_map = FALSE,
                     quote_strings = TRUE
                     ) {
+
+  check_string(x_arg)
+  check_string(y_arg)
+  check_number_decimal(tolerance, allow_null = TRUE, min = 0)
+  check_number_whole(max_diffs, min = 1, allow_infinite = TRUE)
+  check_bool(ignore_srcref)
+  if (!isTRUE(ignore_attr) && !isFALSE(ignore_attr) && !is.character(ignore_attr)) {
+    stop_input_type(ignore_attr, "a TRUE, a FALSE, or a character vector")
+  }
+  check_bool(ignore_encoding)
+  check_bool(ignore_function_env)
+  check_bool(ignore_formula_env)
+  check_bool(list_as_map)
+  check_bool(quote_strings)
 
   opts <- compare_opts(
     ...,
@@ -210,6 +224,16 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
       attrs(y, c(slotNames(y), "class")),
       paths, opts)
     )
+  } else if (is.object(x) && inherits(x, "S7_object")) {
+    out <- c(out, compare_character(class(x), class(y), glue::glue("class({paths})")))
+    out <- c(out, compare_by_prop(x, y, paths, opts))
+
+    # S7 objects can have attributes that are not slots
+    out <- c(out, compare_by_attr(
+      attrs(x, c(S7::prop_names(x), "class", "S7_class")),
+      attrs(y, c(S7::prop_names(y), "class", "S7_class")),
+      paths, opts)
+    )
   } else if (!isTRUE(opts$ignore_attr)) {
     if (is_call(x) && opts$ignore_formula_env) {
       attr(x, ".Environment") <- NULL
@@ -219,6 +243,10 @@ compare_structure <- function(x, y, paths = c("x", "y"), opts = compare_opts()) 
     if ((is_closure(x) || is_call(x)) && opts$ignore_srcref) {
       x <- zap_srcref(x)
       y <- zap_srcref(y)
+    }
+
+    if (compare_as_numeric(x, y, opts$tolerance)) {
+      opts$ignore_attr <- union(opts$ignore_attr, "class")
     }
 
     out <- c(out, compare_by_attr(attrs(x, opts$ignore_attr), attrs(y, opts$ignore_attr), paths, opts))
@@ -381,7 +409,7 @@ compare_terminate <- function(x, y, paths,
     return(character())
   }
 
-  if (!is.null(tolerance) && is_numeric(x) && is_numeric(y)) {
+  if (compare_as_numeric(x, y, tolerance)) {
     return(character())
   }
 
@@ -454,6 +482,11 @@ index_slot <- function(x, y) union(slotNames(x), slotNames(y))
 extract_slot <- function(x, i) if (.hasSlot(x, i)) slot(x, i) else missing_arg()
 path_slot <- function(path, i) glue::glue("{path}@{i}")
 compare_by_slot <- compare_by(index_slot, extract_slot, path_slot)
+
+index_prop <- function(x, y) union(S7::prop_names(x), S7::prop_names(y))
+extract_prop <- function(x, i) if (S7::prop_exists(x, i)) S7::prop(x, i) else missing_arg()
+path_prop <- function(path, i) glue::glue("{path}@{i}")
+compare_by_prop <- compare_by(index_prop, extract_prop, path_prop)
 
 extract_fun <- function(x, i) switch(i, fn_body(x), fn_fmls(x), fn_env(x))
 path_fun <- function(path, i) {

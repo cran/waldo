@@ -184,6 +184,34 @@
       `old` is an S3 object of class <a>, a double vector
       `new` is an integer vector (1)
 
+# can compare int64s
+
+    Code
+      compare(int64_1, int64_1)
+    Output
+      v No differences
+    Code
+      compare(int64_0, int64_1)
+    Output
+      `old`: "0"
+      `new`: "1"
+
+# can ignore numeric differences between int64 and other numbers
+
+    Code
+      compare(1, int64_1)
+    Output
+      `old` is a double vector (1)
+      `new` is an S3 object of class <integer64>, a double vector
+    Code
+      compare(1, int64_1, tolerance = 0)
+    Output
+      v No differences
+    Code
+      compare(1L, int64_1, tolerance = 0)
+    Output
+      v No differences
+
 # ignores S3 [[ methods
 
     Code
@@ -366,8 +394,8 @@
       `names(formals(old))`: "x" "y"    
       `names(formals(new))`: "x" "y" "z"
       
-      `formals(old)$y`: 2
-      `formals(new)$y`: 1
+      `formals(old)$y`: 2.0
+      `formals(new)$y`: 1.0
       
       `formals(old)$z` is absent
       `formals(new)$z` is a double vector (1)
@@ -378,26 +406,6 @@
       })
       compare(f1, f4)
     Output
-      `body(old)`: `{` `}`            
-      `body(new)`: `{` `    x + y` `}`
-    Code
-      compare(f1, f4, ignore_srcref = FALSE)
-    Output
-      `attr(old, 'srcref')`:  2 8  2 33 8 33  2  2
-      `attr(new, 'srcref')`: 14 8 16  1 8  1 14 16
-      
-      `attr(body(old), 'srcref')` is length 1
-      `attr(body(new), 'srcref')` is length 2
-      
-      `attr(body(old), 'srcref')[[1]]`:  2 31  2 31 31 31  2  2
-      `attr(body(new), 'srcref')[[1]]`: 14 31 14 31 31 31 14 14
-      
-      `attr(body(old), 'srcref')[[2]]` is absent
-      `attr(body(new), 'srcref')[[2]]` is an S3 object of class <srcref>, an integer vector
-      
-      `attr(body(old), 'wholeSrcref')`: 1 0  2 33 0 33 1  2
-      `attr(body(new), 'wholeSrcref')`: 1 0 16  1 0  1 1 16
-      
       `body(old)`: `{` `}`            
       `body(new)`: `{` `    x + y` `}`
     Code
@@ -412,16 +420,32 @@
 # can choose to compare srcrefs
 
     Code
-      f1 <- f2 <- (function() { })
-      attr(f2, "srcref") <- "{  }"
       compare(f2, f1)
     Output
       v No differences
     Code
       compare(f2, f1, ignore_srcref = FALSE)
     Output
-      `attr(old, 'srcref')` is a character vector ('{  }')
+      `attr(old, 'srcref')` is absent
       `attr(new, 'srcref')` is an S3 object of class <srcref>, an integer vector
+    Code
+      # Different body
+      compare(f3, f1, ignore_srcref = FALSE)
+    Output
+      `attr(old, 'srcref')`: 225  9 227 3  9 3 225 227
+      `attr(new, 'srcref')`: 221 15 223 3 15 3 221 223
+      
+      `attr(body(old), 'srcref')[[1]]`: 225 20 225 20 20 20 225 225
+      `attr(body(new), 'srcref')[[1]]`: 221 26 221 26 26 26 221 221
+      
+      `attr(body(old), 'srcref')[[2]]`: 226 5 226 9 5 9 226 226
+      `attr(body(new), 'srcref')[[2]]`: 222 5 222 9 5 9 222 222
+      
+      `attr(body(old), 'wholeSrcref')`: 1 0 227 3 0 3 1 227
+      `attr(body(new), 'wholeSrcref')`: 1 0 223 3 0 3 1 223
+      
+      `body(old)`: `{` `    1 + 3` `}`
+      `body(new)`: `{` `    1 + 2` `}`
 
 # can compare atomic vectors
 
@@ -501,6 +525,14 @@
       `attr(old, 'bar')` is a double vector (2)
       `attr(new, 'bar')` is absent
 
+# can distinguish S4 bit
+
+    Code
+      compare(1, asS4(1))
+    Output
+      `old` is a double vector (1)
+      `new` is an S4 object of class <numeric> (1)
+
 # can compare R6 objects
 
     Code
@@ -551,6 +583,48 @@
     Output
       v No differences
 
+# can compare S7 objects
+
+    Code
+      # Non S7
+      compare(A(1), 1)
+    Output
+      `old` is an S7 object of class <waldo::A>
+      `new` is a double vector (1)
+    Code
+      compare(A(1), globalenv())
+    Output
+      `old` is an S7 object of class <waldo::A>
+      `new` is an environment
+    Code
+      compare(A(1), factor("x"))
+    Output
+      `old` is an S7 object of class <waldo::A>
+      `new` is an S3 object of class <factor>, an integer vector
+    Code
+      # S4
+      compare(A(1), A(1))
+    Output
+      v No differences
+    Code
+      compare(A(1), A(2))
+    Output
+      `old@a`: 1.0
+      `new@a`: 2.0
+    Code
+      compare(A(1), B(1))
+    Output
+      `class(old)`: "waldo::A" "S7_object"            
+      `class(new)`: "waldo::B" "waldo::A"  "S7_object"
+    Code
+      # S7 with extra attributes
+      new <- old <- A(1)
+      attr(new, "bar") <- 2
+      compare(new, old)
+    Output
+      `attr(old, 'bar')` is a double vector (2)
+      `attr(new, 'bar')` is absent
+
 # Named environments compare by reference
 
     Code
@@ -582,8 +656,8 @@
       e2$x <- 11
       compare(e1, e2)
     Output
-      `old$x`: 10
-      `new$x`: 11
+      `old$x`: 10.0
+      `new$x`: 11.0
     Code
       e2$x <- 10
       compare(e1, e2)
@@ -601,8 +675,8 @@
       e4 <- new.env(parent = e2)
       compare(e3, e4)
     Output
-      `parent.env(old)$x`: 1
-      `parent.env(new)$x`: 2
+      `parent.env(old)$x`: 1.0
+      `parent.env(new)$x`: 2.0
 
 # don't get caught in endless loops
 
@@ -633,11 +707,11 @@
       e3$x <- 3
       compare(list(e1, e1, e1), list(e2, e2, e3))
     Output
-      `old[[1]]$x`: 1
-      `new[[1]]$x`: 2
+      `old[[1]]$x`: 1.0
+      `new[[1]]$x`: 2.0
       
-      `old[[3]]$x`: 1
-      `new[[3]]$x`: 3
+      `old[[3]]$x`: 1.0
+      `new[[3]]$x`: 3.0
 
 # can compare CHARSXP
 
@@ -693,8 +767,8 @@
     Code
       compare(foo1, foo2)
     Output
-      `proxy(old)$x`: 1
-      `proxy(new)$x`: 2
+      `proxy(old)$x`: 1.0
+      `proxy(new)$x`: 2.0
 
 # can opt out of string quoting
 

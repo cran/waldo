@@ -1,13 +1,13 @@
 oo_type <- function(x) {
-  if (is.object(x)) {
-    if (isS4(x)) {
-      "S4"
+  if (isS4(x)) {
+    "S4"
+  } else if (is.object(x)) {
+    if (inherits(x, "S7_object")) {
+      "S7"
+    } else if (inherits(x, "R6")) {
+      "R6"
     } else {
-      if (inherits(x, "R6")) {
-        "R6"
-      } else {
-        "S3"
-      }
+      "S3"
     }
   } else {
     "base"
@@ -19,12 +19,14 @@ friendly_type_of <- function(x) {
     return("absent")
   }
 
-  if (!is.object(x)) {
+  if (!is.object(x) && !isS4(x)) {
     return(friendly_type(typeof(x)))
   }
 
   if (!isS4(x)) {
-    if (inherits(x, "R6")) {
+    if (inherits(x, "S7_object")) {
+      paste0("an S7 object of class <", class(x)[[1]], ">")
+    } else if (inherits(x, "R6")) {
       klass <- paste(setdiff(class(x), "R6"), collapse = "/")
       paste0("an R6 object of class <", klass, ">")
     } else {
@@ -106,7 +108,15 @@ attrs <- function(x, ignore) {
   out[c(first, rest)]
 }
 
-is_numeric <- function(x) is_integer(x) || is_double(x)
+compare_as_numeric <- function(x, y, tol) {
+  !is.null(tol) && is_numeric(x) && is_numeric(y)
+}
+is_numeric <- function(x) {
+  is_integer(x) || is_double(x) || is_int64(x)
+}
+is_int64 <- function(x) {
+  inherits(x, "integer64")
+}
 
 in_ci <- function() {
   isTRUE(as.logical(Sys.getenv("CI", "FALSE")))
@@ -158,9 +168,10 @@ compact <- function(x) {
 }
 
 as_map <- function(x) {
+  attr <- attributes(x)
+
   # Remove nulls
-  is_null <- vapply(x, is.null, logical(1))
-  x <- x[!is_null]
+  x <- compact(x)
 
   # Sort named components, preserving positions of unnamed
   nx <- names2(x)
@@ -170,6 +181,11 @@ as_map <- function(x) {
     idx[is_named] <- idx[is_named][order(nx[is_named])]
     x <- x[idx]
   }
+
+  # Restore attributes (which might have been lost by [)
+  new_attr <- attributes(x)
+  attr[names(new_attr)] <- new_attr
+  attributes(x) <- attr
 
   x
 }

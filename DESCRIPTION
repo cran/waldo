@@ -1,6 +1,6 @@
 Package: waldo
 Title: Find Differences Between R Objects
-Version: 0.5.3
+Version: 0.6.0
 Authors@R: c(
     person("Hadley", "Wickham", , "hadley@posit.co", role = c("aut", "cre")),
     person("Posit Software, PBC", role = c("cph", "fnd"))
@@ -12,18 +12,17 @@ Description: Compare complex R objects and reveal the key differences.
 License: MIT + file LICENSE
 URL: https://waldo.r-lib.org, https://github.com/r-lib/waldo
 BugReports: https://github.com/r-lib/waldo/issues
-Depends: R (>= 3.6)
-Imports: cli, diffobj (>= 0.3.4), glue, methods, rematch2, rlang (>=
-        1.0.0), tibble
-Suggests: covr, R6, testthat (>= 3.0.0), withr, xml2
+Depends: R (>= 4.0)
+Imports: cli, diffobj (>= 0.3.4), glue, methods, rlang (>= 1.1.0)
+Suggests: bit64, R6, S7, testthat (>= 3.0.0), withr, xml2
 Config/Needs/website: tidyverse/tidytemplate
 Config/testthat/edition: 3
 Encoding: UTF-8
 RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2024-08-23 20:40:36 UTC; hadleywickham
+Packaged: 2024-11-04 13:34:27 UTC; hadleywickham
 Author: Hadley Wickham [aut, cre],
   Posit Software, PBC [cph, fnd]
 Maintainer: Hadley Wickham <hadley@posit.co>
 Repository: CRAN
-Date/Publication: 2024-08-23 22:00:02 UTC
+Date/Publication: 2024-11-04 16:40:02 UTC

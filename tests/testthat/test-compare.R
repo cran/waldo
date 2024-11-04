@@ -96,6 +96,24 @@ test_that("can ignore minor numeric differences", {
   expect_equal(compare_structure(x, x + 1e-9, opts = compare_opts(tolerance = 1e-6)), character())
 })
 
+test_that("can compare int64s", {
+  int64_0 <- bit64::as.integer64(0)
+  int64_1 <- bit64::as.integer64(1)
+  expect_snapshot({
+    compare(int64_1, int64_1)
+    compare(int64_0, int64_1)
+  })
+})
+
+test_that("can ignore numeric differences between int64 and other numbers", {
+  int64_1 <- bit64::as.integer64(1)
+  expect_snapshot({
+    compare(1, int64_1)
+    compare(1, int64_1, tolerance = 0)
+    compare(1L, int64_1, tolerance = 0)
+  })
+})
+
 test_that("ignores S3 [[ methods", {
   expect_snapshot({
     x <- as.POSIXlt("2020-01-01")
@@ -191,7 +209,6 @@ test_that("comparing functions gives useful diffs", {
     "diff body"
     f4 <- function(x = 1, y = 2) { x + y }
     compare(f1, f4)
-    compare(f1, f4, ignore_srcref = FALSE)
 
     "diff environment"
     environment(f1) <- base_env()
@@ -201,12 +218,19 @@ test_that("comparing functions gives useful diffs", {
 })
 
 test_that("can choose to compare srcrefs", {
-  expect_snapshot({
-    f1 <- f2 <- function() {}
-    attr(f2, "srcref") <- "{  }"
+  f1 <- f2 <- function() {
+    1 + 2
+  }
+  attr(f2, "srcref") <- NULL
+  f3 <- function() {
+    1 + 3
+  }
 
+  expect_snapshot({
     compare(f2, f1)
     compare(f2, f1, ignore_srcref = FALSE)
+    "Different body"
+    compare(f3, f1, ignore_srcref = FALSE)
   })
 })
 
@@ -252,6 +276,12 @@ test_that("can compare S4 objects", {
   })
 })
 
+test_that("can distinguish S4 bit", {
+  expect_snapshot({
+    compare(1, asS4(1))
+  })
+})
+
 test_that("can compare R6 objects", {
   expect_snapshot({
     goofy <- R6::R6Class("goofy", public = list(
@@ -276,6 +306,29 @@ test_that("can compare R6 objects", {
     compare(froofy$new(1), froofy$new(1)$clone())
   })
 })
+
+test_that("can compare S7 objects", {
+  A <- S7::new_class("A", properties = list(a = S7::class_numeric), package = "waldo")
+  B <- S7::new_class("B", parent = A, package = "waldo")
+
+  expect_snapshot({
+    "Non S7"
+    compare(A(1), 1)
+    compare(A(1), globalenv())
+    compare(A(1), factor("x"))
+
+    "S4"
+    compare(A(1), A(1))
+    compare(A(1), A(2))
+    compare(A(1), B(1))
+
+    "S7 with extra attributes"
+    new <- old <- A(1)
+    attr(new, "bar") <- 2
+    compare(new, old)
+  })
+})
+
 
 test_that("Named environments compare by reference", {
   expect_snapshot({
