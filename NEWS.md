@@ -1,3 +1,7 @@
+# waldo 0.6.1
+
+* Only use special bit64 comparison if package is installed.
+
 # waldo 0.6.0
 
 * waldo no longer imports tibble and rematch2 (@olivroy, #196), and

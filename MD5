@@ -1,7 +1,7 @@
-8517dd42562d973c97615b5851f95656 *DESCRIPTION
+24b1c2b9cd0657bd6908dc398b01f589 *DESCRIPTION
 7be88896a6c4a4461e69c8cb0d82e1f0 *LICENSE
 6939592a153222dbe5b30bd018a93415 *NAMESPACE
-53da72527ecff0c232f04e2b8558d493 *NEWS.md
+f9861acf9edca413b735d0aee0f9f9ec *NEWS.md
 4816ee96e748835ec740d96abfed0874 *R/compare-class.R
 e3fa946b455d123f24ea38ddd7eb7b3a *R/compare-data-frame.R
 ab974bd790ddd93f35f1ec53ba4b9bae *R/compare-opts.R
@@ -10,7 +10,7 @@ be4b3d4360857431a1a614071fa35cad *R/compare-value.R
 f5fc493ce35961109b3736876ef4fd92 *R/diff.R
 799bdb3344a8c0c98ff29fa5f7055f01 *R/import-standalone-obj-type.R
 62545d8f97ad53b42ec2efcbde7de6bc *R/import-standalone-types-check.R
-ab329c334344fc9a31c1b9c1666c60ef *R/num_equal.R
+ec07ddb229d238f23a4f236173ff94ae *R/num_equal.R
 c9daace37b97c65f323da7071875be61 *R/proxy.R
 0f881ed97216916b1aae86c663488b5d *R/rematch.R
 e7a94eb4706b5197f75077f52884ab2e *R/ses.R
